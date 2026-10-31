@@ -91,12 +91,13 @@ public abstract class MicroserviceKafkaConsumer extends TenantEngineLifecycleCom
     protected Properties buildConfiguration() throws SiteWhereException {
 	Properties config = new Properties();
 	config.put(ConsumerConfig.CLIENT_ID_CONFIG, getConsumerId());
-	config.put(ConsumerConfig.GROUP_ID_CONFIG, getConsumerGroupId());
 	config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KafkaUtils.getBootstrapServers(getMicroservice()));
 	config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
 	config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
-	config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+	config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
 	config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+	config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
+	config.put(ConsumerConfig.METADATA_MAX_AGE_CONFIG, Integer.MAX_VALUE);
 	config.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, 1000);
 	return config;
     }
@@ -126,7 +127,7 @@ public abstract class MicroserviceKafkaConsumer extends TenantEngineLifecycleCom
 		try {
 		    getLogger()
 			    .debug(String.format("Kafka consumer subscribing to %s", getSourceTopicNames().toString()));
-		    getConsumer().subscribe(getSourceTopicNames());
+		    getConsumer().assign(KafkaUtils.getPartitions(getMicroservice(), getSourceTopicNames()));
 		    break;
 		} catch (SiteWhereException e) {
 		    getLogger().error("Unable to subscribe to topics.", e);
