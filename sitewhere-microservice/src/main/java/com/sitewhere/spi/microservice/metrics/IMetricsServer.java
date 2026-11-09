@@ -21,4 +21,20 @@ import com.sitewhere.spi.microservice.lifecycle.ILifecycleComponent;
  * Provides Prometheus metrics over HTTP.
  */
 public interface IMetricsServer extends ILifecycleComponent {
+
+    /**
+     * Register an additional endpoint to be served by the HTTP server. If the
+     * server is not currently running, the endpoint will be attached when the
+     * server starts.
+     * 
+     * @param endpoint
+     */
+    void registerEndpoint(IMetricsHttpEndpoint endpoint);
+
+    /**
+     * Unregister a previously added endpoint.
+     * 
+     * @param endpoint
+     */
+    void unregisterEndpoint(IMetricsHttpEndpoint endpoint);
 }
