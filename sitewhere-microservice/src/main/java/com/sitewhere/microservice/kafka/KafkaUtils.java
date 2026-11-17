@@ -18,13 +18,18 @@ package com.sitewhere.microservice.kafka;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.TopicPartitionInfo;
+import org.apache.kafka.common.errors.TopicExistsException;
 
 import com.sitewhere.microservice.configuration.model.instance.infrastructure.KafkaConfiguration;
 import com.sitewhere.spi.SiteWhereException;
@@ -56,6 +61,13 @@ public class KafkaUtils {
      * attempt does the same). The admin client sends its calls once its metadata
      * are ready, one request at a time.
      * 
+     * The topics missing are created first (partitions and replication factor of
+     * the instance, as KafkaTopicWaiter for the producers): a description never
+     * auto-creates a topic, unlike the subscription of the former Kafka Streams
+     * pipelines, and a source topic without producer (inbound-reprocess-events)
+     * would never exist, the consumer retrying forever on
+     * UnknownTopicOrPartitionException.
+     * 
      * @param microservice
      * @param topics
      * @return
@@ -66,6 +78,7 @@ public class KafkaUtils {
 	Properties config = new Properties();
 	config.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getBootstrapServers(microservice));
 	try (AdminClient admin = AdminClient.create(config)) {
+	    createMissingTopics(microservice, admin, topics);
 	    List<TopicPartition> partitions = new ArrayList<>();
 	    for (TopicDescription topic : admin.describeTopics(topics).all()
 		    .get(PARTITIONS_TIMEOUT_SECONDS, TimeUnit.SECONDS).values()) {
@@ -77,6 +90,36 @@ public class KafkaUtils {
 		}
 	    }
 	    return partitions;
+	}
+    }
+
+    /**
+     * Create the topics of the list not known by the broker, with the default
+     * partitions and replication factor of the instance. A topic created meanwhile
+     * by another client (TopicExistsException) is fine.
+     * 
+     * @param microservice
+     * @param admin
+     * @param topics
+     * @throws Exception
+     */
+    protected static void createMissingTopics(IMicroservice<?, ?> microservice, AdminClient admin,
+	    List<String> topics) throws Exception {
+	Set<String> existing = admin.listTopics().names().get(PARTITIONS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+	List<String> missing = topics.stream().filter(topic -> !existing.contains(topic)).distinct()
+		.collect(Collectors.toList());
+	if (missing.isEmpty()) {
+	    return;
+	}
+	KafkaConfiguration kafka = microservice.getInstanceConfiguration().getInfrastructure().getKafka();
+	List<NewTopic> created = missing.stream().map(topic -> new NewTopic(topic, kafka.getDefaultTopicPartitions(),
+		(short) kafka.getDefaultTopicReplicationFactor())).collect(Collectors.toList());
+	try {
+	    admin.createTopics(created).all().get(PARTITIONS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+	} catch (ExecutionException e) {
+	    if (!(e.getCause() instanceof TopicExistsException)) {
+		throw e;
+	    }
 	}
     }
 }

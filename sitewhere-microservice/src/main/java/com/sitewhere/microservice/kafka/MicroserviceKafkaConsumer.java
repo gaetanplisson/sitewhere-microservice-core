@@ -96,7 +96,9 @@ public abstract class MicroserviceKafkaConsumer extends TenantEngineLifecycleCom
 	config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
 	config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
 	config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-	config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
+	// No max.poll.records=1: after returning the record of a partition, the consumer fetches only the other
+	// partitions (the first one still has a buffered fetch), and that fetch, empty, is held by the broker for
+	// fetch.max.wait.ms; the next records of the first partition then wait for it (0 to 1000 ms per consumer)
 	config.put(ConsumerConfig.METADATA_MAX_AGE_CONFIG, Integer.MAX_VALUE);
 	config.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, 1000);
 	return config;
