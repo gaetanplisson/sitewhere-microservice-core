@@ -158,7 +158,10 @@ public abstract class MicroserviceKafkaProducer<K, P> extends TenantEngineLifecy
 	config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, getValueSerializer().getName());
     config.put(ProducerConfig.LINGER_MS_CONFIG, 0);
 	config.put(ProducerConfig.METADATA_MAX_AGE_CONFIG, Integer.MAX_VALUE);
-	return config;
+    config.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 1);
+    config.put(ProducerConfig.BATCH_SIZE_CONFIG, 1000 * 10 * 200); // AU PIRE: 1000 octets par messages * 10 Hz au max * 200 iot
+	config.put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, 1000 * 10 * 200); // AU PIRE: 1000 octets par messages * 10 Hz au max * 200 iot
+    return config;
     }
 
     /**
